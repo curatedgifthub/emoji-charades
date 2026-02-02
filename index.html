@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Emoji Charades</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100dvh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+        }
+
+        /* --- ROTATE WARNING (portrait only) --- */
+        #rotate-warning {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #1a1a2e;
+            color: white;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #rotate-warning .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: wiggle 1s ease-in-out infinite;
+        }
+
+        #rotate-warning p {
+            font-size: 1.3rem;
+            line-height: 1.6;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+        }
+
+        @media (orientation: portrait) {
+            #rotate-warning { display: flex; }
+            #app { display: none !important; }
+        }
+
+        /* --- APP CONTAINER --- */
+        #app {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .screen.active { display: flex; }
+
+        /* --- MENU SCREEN --- */
+        #menu-screen {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        #menu-screen h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        #menu-screen .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .menu-btn {
+            background: white;
+            border: none;
+            border-radius: 50px;
+            padding: 18px 50px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #764ba2;
+            cursor: pointer;
+            margin: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .time-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .time-btn {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            padding: 10px 18px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+
+        .time-btn.selected {
+            background: white;
+            color: #764ba2;
+            border-color: white;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            font-size: 0.95rem;
+            opacity: 0.85;
+            line-height: 1.6;
+        }
+
+        /* --- GAME SCREEN --- */
+        #game-screen {
+            position: relative;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Invisible tap layer - covers entire screen, above everything */
+        #tap-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            cursor: pointer;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(0,0,0,0.25);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        #timer.warning {
+            background: rgba(255,0,0,0.5);
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            to { transform: scale(1.1); }
+        }
+
+        /* Main emoji display */
+        #game-emoji {
+            font-size: min(50vw, 45vh);
+            line-height: 1;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.2));
+        }
+
+        #game-word {
+            font-size: min(12vw, 10vh);
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            margin-top: 15px;
+        }
+
+        /* Flash feedback */
+        #flash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 200;
+        }
+
+        #flash.correct {
+            background: #22c55e;
+            animation: flash 0.25s;
+        }
+
+        #flash.skip {
+            background: #ef4444;
+            animation: flash 0.25s;
+        }
+
+        @keyframes flash {
+            0% { opacity: 0.5; }
+            100% { opacity: 0; }
+        }
+
+        /* --- RESULTS SCREEN --- */
+        #results-screen {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .results-score {
+            font-size: 5rem;
+            font-weight: bold;
+        }
+
+        .results-label {
+            font-size: 1.3rem;
+            opacity: 0.8;
+            margin-bottom: 25px;
+        }
+
+        .results-summary {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 25px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item .num {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .summary-item .lbl {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .results-list {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 10px 15px;
+            max-height: 25vh;
+            overflow-y: auto;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 25px;
+        }
+
+        .result-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            gap: 10px;
+        }
+
+        .result-row:last-child { border-bottom: none; }
+
+        .result-emoji { font-size: 1.4rem; }
+        .result-name { flex: 1; text-align: left; }
+        .result-status { font-size: 1.2rem; }
+
+        .results-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .results-btn {
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-play {
+            background: #22c55e;
+            color: white;
+        }
+
+        .btn-home {
+            background: transparent;
+            border: 2px solid rgba(255,255,255,0.5);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ROTATE WARNING -->
+    <div id="rotate-warning">
+        <div class="icon">📱</div>
+        <p>Please rotate your phone<br>to <strong>landscape</strong> mode</p>
+    </div>
+
+    <!-- APP -->
+    <div id="app">
+
+        <!-- MENU -->
+        <div id="menu-screen" class="screen active">
+            <h1>🎭 Emoji Charades</h1>
+            <p class="subtitle">Heads Up for little ones!</p>
+            
+            <button class="menu-btn" onclick="startGame()">▶️ Play!</button>
+            
+            <div class="time-options">
+                <button class="time-btn" data-time="30">30s</button>
+                <button class="time-btn selected" data-time="45">45s</button>
+                <button class="time-btn" data-time="60">60s</button>
+            </div>
+            
+            <div class="instructions">
+                📱 Hold phone on forehead<br>
+                ✅ Tap TOP half = Correct<br>
+                ⏭️ Tap BOTTOM half = Skip
+            </div>
+        </div>
+
+        <!-- GAME -->
+        <div id="game-screen" class="screen">
+            <!-- Invisible tap layer -->
+            <div id="tap-layer"></div>
+
+            <div id="hud">
+                <div class="hud-item">✅ <span id="correct-count">0</span></div>
+                <div class="hud-item" id="timer">45</div>
+                <div class="hud-item">⏭️ <span id="skip-count">0</span></div>
+            </div>
+
+            <div id="game-emoji">🦁</div>
+            <div id="game-word">Lion</div>
+
+            <div id="flash"></div>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="results-screen" class="screen">
+            <div class="results-score" id="final-score">0</div>
+            <div class="results-label">Correct!</div>
+            
+            <div class="results-summary">
+                <div class="summary-item">
+                    <div class="num" id="total-correct">0</div>
+                    <div class="lbl">Correct</div>
+                </div>
+                <div class="summary-item">
+                    <div class="num" id="total-skipped">0</div>
+                    <div class="lbl">Skipped</div>
+                </div>
+            </div>
+            
+            <div class="results-list" id="results-list"></div>
+            
+            <div class="results-buttons">
+                <button class="results-btn btn-home" onclick="goHome()">🏠 Home</button>
+                <button class="results-btn btn-play" onclick="startGame()">🔄 Play Again</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA ---
+        const emojis = [
+            // Animals
+            {icon: '🦁', name: 'Lion'}, {icon: '🐶', name: 'Dog'}, {icon: '🐱', name: 'Cat'}, 
+            {icon: '🐸', name: 'Frog'}, {icon: '🐵', name: 'Monkey'}, {icon: '🐔', name: 'Chicken'}, 
+            {icon: '🐮', name: 'Cow'}, {icon: '🐷', name: 'Pig'}, {icon: '🐍', name: 'Snake'}, 
+            {icon: '🐘', name: 'Elephant'}, {icon: '🦈', name: 'Shark'}, {icon: '🦋', name: 'Butterfly'},
+            {icon: '🦆', name: 'Duck'}, {icon: '🦖', name: 'Dinosaur'}, {icon: '🐻', name: 'Bear'},
+            {icon: '🐰', name: 'Bunny'}, {icon: '🦉', name: 'Owl'}, {icon: '🐝', name: 'Bee'},
+            {icon: '🐟', name: 'Fish'}, {icon: '🦀', name: 'Crab'}, {icon: '🐢', name: 'Turtle'},
+            {icon: '🐊', name: 'Crocodile'}, {icon: '🦩', name: 'Flamingo'}, {icon: '🐧', name: 'Penguin'},
+            
+            // Actions/Emotions
+            {icon: '😴', name: 'Sleeping'}, {icon: '🏃', name: 'Running'}, {icon: '🏊', name: 'Swimming'}, 
+            {icon: '💃', name: 'Dancing'}, {icon: '😭', name: 'Crying'}, {icon: '😠', name: 'Angry'},
+            {icon: '🤧', name: 'Sneezing'}, {icon: '🥶', name: 'Freezing'}, {icon: '🤫', name: 'Shhhh'},
+            {icon: '😱', name: 'Scared'}, {icon: '🥳', name: 'Party'}, {icon: '🤪', name: 'Silly'}, 
+            {icon: '😋', name: 'Yummy'}, {icon: '🤢', name: 'Yucky'},
+            
+            // Things
+            {icon: '✈️', name: 'Airplane'}, {icon: '🚗', name: 'Car'}, {icon: '🚂', name: 'Train'}, 
+            {icon: '🚀', name: 'Rocket'}, {icon: '📞', name: 'Phone'}, {icon: '📷', name: 'Camera'},
+            {icon: '🥁', name: 'Drums'}, {icon: '🎸', name: 'Guitar'}, {icon: '🎤', name: 'Singing'},
+            {icon: '⚽', name: 'Soccer'}, {icon: '🏀', name: 'Basketball'}, {icon: '🎹', name: 'Piano'},
+            
+            // Characters
+            {icon: '👻', name: 'Ghost'}, {icon: '👽', name: 'Alien'}, {icon: '🤖', name: 'Robot'}, 
+            {icon: '🧟', name: 'Zombie'}, {icon: '🤴', name: 'Prince'}, {icon: '👸', name: 'Princess'},
+            {icon: '👶', name: 'Baby'}, {icon: '🧙', name: 'Wizard'}, {icon: '🦸', name: 'Superhero'},
+            {icon: '🧜', name: 'Mermaid'}, {icon: '🤠', name: 'Cowboy'}, {icon: '🧛', name: 'Vampire'}
+        ];
+
+        // --- STATE ---
+        let deck = [];
+        let roundTime = 45;
+        let timeLeft = 0;
+        let timerInterval = null;
+        let correctCount = 0;
+        let skipCount = 0;
+        let results = [];
+        let currentEmoji = null;
+        let cooldown = false;
+        const COOLDOWN_MS = 600;
+
+        // --- DECK ---
+        function shuffleDeck() {
+            deck = [...emojis];
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function getNext() {
+            if (deck.length === 0) shuffleDeck();
+            return deck.pop();
+        }
+
+        shuffleDeck();
+
+        // --- TIME SELECTOR ---
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                roundTime = parseInt(btn.dataset.time);
+            });
+        });
+
+        // --- NAVIGATION ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function goHome() {
+            stopGame();
+            showScreen('menu-screen');
+        }
+
+        // --- GAME ---
+        function startGame() {
+            correctCount = 0;
+            skipCount = 0;
+            results = [];
+            timeLeft = roundTime;
+            cooldown = false;
+
+            document.getElementById('correct-count').textContent = '0';
+            document.getElementById('skip-count').textContent = '0';
+            document.getElementById('timer').textContent = timeLeft;
+            document.getElementById('timer').classList.remove('warning');
+
+            showScreen('game-screen');
+            showNext();
+            startTimer();
+        }
+
+        function showNext() {
+            currentEmoji = getNext();
+            document.getElementById('game-emoji').textContent = currentEmoji.icon;
+            document.getElementById('game-word').textContent = currentEmoji.name;
+        }
+
+        function handleAction(type) {
+            if (cooldown) return;
+            cooldown = true;
+
+            results.push({ ...currentEmoji, correct: type === 'correct' });
+
+            if (type === 'correct') {
+                correctCount++;
+                document.getElementById('correct-count').textContent = correctCount;
+            } else {
+                skipCount++;
+                document.getElementById('skip-count').textContent = skipCount;
+            }
+
+            // Flash feedback
+            const flash = document.getElementById('flash');
+            flash.className = type;
+            setTimeout(() => flash.className = '', 250);
+
+            // Haptic feedback
+            if ('vibrate' in navigator) {
+                navigator.vibrate(type === 'correct' ? 50 : [30, 30, 30]);
+            }
+
+            setTimeout(() => {
+                cooldown = false;
+                showNext();
+            }, COOLDOWN_MS);
+        }
+
+        function startTimer() {
+            const timerEl = document.getElementById('timer');
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.textContent = timeLeft;
+
+                if (timeLeft <= 10) {
+                    timerEl.classList.add('warning');
+                }
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function stopGame() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function endGame() {
+            stopGame();
+
+            document.getElementById('final-score').textContent = correctCount;
+            document.getElementById('total-correct').textContent = correctCount;
+            document.getElementById('total-skipped').textContent = skipCount;
+
+            const listEl = document.getElementById('results-list');
+            if (results.length === 0) {
+                listEl.innerHTML = '<div style="padding:10px;opacity:0.6;">No answers recorded</div>';
+            } else {
+                listEl.innerHTML = results.map(r => `
+                    <div class="result-row">
+                        <span class="result-emoji">${r.icon}</span>
+                        <span class="result-name">${r.name}</span>
+                        <span class="result-status">${r.correct ? '✅' : '⏭️'}</span>
+                    </div>
+                `).join('');
+            }
+
+            showScreen('results-screen');
+        }
+
+        // --- TAP LAYER: detect Y position to determine top/bottom half ---
+        const tapLayer = document.getElementById('tap-layer');
+
+        function handleTap(clientY) {
+            const rect = tapLayer.getBoundingClientRect();
+            const relativeY = clientY - rect.top;
+            const halfHeight = rect.height / 2;
+
+            if (relativeY < halfHeight) {
+                handleAction('correct');
+            } else {
+                handleAction('skip');
+            }
+        }
+
+        tapLayer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleTap(e.touches[0].clientY);
+        }, { passive: false });
+
+        tapLayer.addEventListener('click', (e) => {
+            handleTap(e.clientY);
+        });
+
+        // Keyboard for desktop testing
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('game-screen').classList.contains('active')) {
+                if (e.key === 'ArrowUp' || e.key === ' ') handleAction('correct');
+                if (e.key === 'ArrowDown' || e.key === 'Escape') handleAction('skip');
+            }
+        });
+    </script>
+</body>
+</html>
