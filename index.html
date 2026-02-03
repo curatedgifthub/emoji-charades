@@ -1,15 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8" />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>Emoji Charades</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
+        :root{
+            --app-height: 100dvh; /* JS will override with visualViewport height */
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+
+        html, body {
+            height: 100%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            height: 100dvh;
+            height: var(--app-height);
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
@@ -55,9 +70,10 @@
 
         /* --- APP CONTAINER --- */
         #app {
-            height: 100%;
+            height: var(--app-height);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         /* --- SCREENS --- */
@@ -75,6 +91,8 @@
             align-items: center;
             justify-content: center;
             color: white;
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
         }
 
         #menu-screen h1 {
@@ -137,12 +155,17 @@
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             align-items: center;
             justify-content: center;
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
         }
 
-        /* Invisible tap layer - covers entire screen, above everything */
+        /* Invisible tap layer - covers the *visible* safe area (avoids browser UI overlap + notches) */
         #tap-layer {
             position: absolute;
-            inset: 0;
+            top: var(--safe-top);
+            bottom: var(--safe-bottom);
+            left: var(--safe-left);
+            right: var(--safe-right);
             z-index: 100;
             cursor: pointer;
         }
@@ -150,9 +173,9 @@
         /* HUD */
         #hud {
             position: absolute;
-            top: 15px;
-            left: 0;
-            right: 0;
+            top: calc(15px + var(--safe-top));
+            left: var(--safe-left);
+            right: var(--safe-right);
             display: flex;
             justify-content: space-between;
             padding: 0 20px;
@@ -224,6 +247,8 @@
             justify-content: center;
             color: white;
             padding: 20px;
+            padding-left: calc(20px + var(--safe-left));
+            padding-right: calc(20px + var(--safe-right));
         }
 
         .results-score {
@@ -323,15 +348,15 @@
         <div id="menu-screen" class="screen active">
             <h1>🎭 Emoji Charades</h1>
             <p class="subtitle">Heads Up for little ones!</p>
-            
+
             <button class="menu-btn" onclick="startGame()">▶️ Play!</button>
-            
+
             <div class="time-options">
                 <button class="time-btn" data-time="30">30s</button>
                 <button class="time-btn selected" data-time="45">45s</button>
                 <button class="time-btn" data-time="60">60s</button>
             </div>
-            
+
             <div class="instructions">
                 📱 Hold phone on forehead<br>
                 ✅ Tap TOP half = Correct<br>
@@ -360,7 +385,7 @@
         <div id="results-screen" class="screen">
             <div class="results-score" id="final-score">0</div>
             <div class="results-label">Correct!</div>
-            
+
             <div class="results-summary">
                 <div class="summary-item">
                     <div class="num" id="total-correct">0</div>
@@ -371,9 +396,9 @@
                     <div class="lbl">Skipped</div>
                 </div>
             </div>
-            
+
             <div class="results-list" id="results-list"></div>
-            
+
             <div class="results-buttons">
                 <button class="results-btn btn-home" onclick="goHome()">🏠 Home</button>
                 <button class="results-btn btn-play" onclick="startGame()">🔄 Play Again</button>
@@ -383,33 +408,53 @@
     </div>
 
     <script>
+        // Keep the app sized to the *visual* viewport so browser UI (address bar)
+        // doesn't steal clickable space or skew top/bottom tap detection.
+        (function setupViewportSizing() {
+            function setAppHeight() {
+                const vv = window.visualViewport;
+                const h = vv ? vv.height : window.innerHeight;
+                document.documentElement.style.setProperty('--app-height', `${h}px`);
+            }
+
+            setAppHeight();
+
+            window.addEventListener('resize', setAppHeight);
+            window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 50));
+
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', setAppHeight);
+                window.visualViewport.addEventListener('scroll', setAppHeight);
+            }
+        })();
+
         // --- DATA ---
         const emojis = [
             // Animals
-            {icon: '🦁', name: 'Lion'}, {icon: '🐶', name: 'Dog'}, {icon: '🐱', name: 'Cat'}, 
-            {icon: '🐸', name: 'Frog'}, {icon: '🐵', name: 'Monkey'}, {icon: '🐔', name: 'Chicken'}, 
-            {icon: '🐮', name: 'Cow'}, {icon: '🐷', name: 'Pig'}, {icon: '🐍', name: 'Snake'}, 
+            {icon: '🦁', name: 'Lion'}, {icon: '🐶', name: 'Dog'}, {icon: '🐱', name: 'Cat'},
+            {icon: '🐸', name: 'Frog'}, {icon: '🐵', name: 'Monkey'}, {icon: '🐔', name: 'Chicken'},
+            {icon: '🐮', name: 'Cow'}, {icon: '🐷', name: 'Pig'}, {icon: '🐍', name: 'Snake'},
             {icon: '🐘', name: 'Elephant'}, {icon: '🦈', name: 'Shark'}, {icon: '🦋', name: 'Butterfly'},
             {icon: '🦆', name: 'Duck'}, {icon: '🦖', name: 'Dinosaur'}, {icon: '🐻', name: 'Bear'},
             {icon: '🐰', name: 'Bunny'}, {icon: '🦉', name: 'Owl'}, {icon: '🐝', name: 'Bee'},
             {icon: '🐟', name: 'Fish'}, {icon: '🦀', name: 'Crab'}, {icon: '🐢', name: 'Turtle'},
             {icon: '🐊', name: 'Crocodile'}, {icon: '🦩', name: 'Flamingo'}, {icon: '🐧', name: 'Penguin'},
-            
+
             // Actions/Emotions
-            {icon: '😴', name: 'Sleeping'}, {icon: '🏃', name: 'Running'}, {icon: '🏊', name: 'Swimming'}, 
+            {icon: '😴', name: 'Sleeping'}, {icon: '🏃', name: 'Running'}, {icon: '🏊', name: 'Swimming'},
             {icon: '💃', name: 'Dancing'}, {icon: '😭', name: 'Crying'}, {icon: '😠', name: 'Angry'},
             {icon: '🤧', name: 'Sneezing'}, {icon: '🥶', name: 'Freezing'}, {icon: '🤫', name: 'Shhhh'},
-            {icon: '😱', name: 'Scared'}, {icon: '🥳', name: 'Party'}, {icon: '🤪', name: 'Silly'}, 
+            {icon: '😱', name: 'Scared'}, {icon: '🥳', name: 'Party'}, {icon: '🤪', name: 'Silly'},
             {icon: '😋', name: 'Yummy'}, {icon: '🤢', name: 'Yucky'},
-            
+
             // Things
-            {icon: '✈️', name: 'Airplane'}, {icon: '🚗', name: 'Car'}, {icon: '🚂', name: 'Train'}, 
+            {icon: '✈️', name: 'Airplane'}, {icon: '🚗', name: 'Car'}, {icon: '🚂', name: 'Train'},
             {icon: '🚀', name: 'Rocket'}, {icon: '📞', name: 'Phone'}, {icon: '📷', name: 'Camera'},
             {icon: '🥁', name: 'Drums'}, {icon: '🎸', name: 'Guitar'}, {icon: '🎤', name: 'Singing'},
             {icon: '⚽', name: 'Soccer'}, {icon: '🏀', name: 'Basketball'}, {icon: '🎹', name: 'Piano'},
-            
+
             // Characters
-            {icon: '👻', name: 'Ghost'}, {icon: '👽', name: 'Alien'}, {icon: '🤖', name: 'Robot'}, 
+            {icon: '👻', name: 'Ghost'}, {icon: '👽', name: 'Alien'}, {icon: '🤖', name: 'Robot'},
             {icon: '🧟', name: 'Zombie'}, {icon: '🤴', name: 'Prince'}, {icon: '👸', name: 'Princess'},
             {icon: '👶', name: 'Baby'}, {icon: '🧙', name: 'Wizard'}, {icon: '🦸', name: 'Superhero'},
             {icon: '🧜', name: 'Mermaid'}, {icon: '🤠', name: 'Cowboy'}, {icon: '🧛', name: 'Vampire'}
